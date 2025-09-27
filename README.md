@@ -1,6 +1,6 @@
 # albumthese ✨ - CLI Photo Gallery Generator
 
-**`albumthese`** is a small command-line interface (CLI) tool designed to quickly generate a responsive, modern, masonry-style photo gallery from a simple directory of images.
+**`albumthese`** is a small command-line interface (CLI) tool designed to quickly generate a responsive, modern, masonry-style photo gallery with an integrated lightbox from a simple directory of images.
 
 It leverages **`sharp`** for high-performance thumbnail creation.
 
@@ -8,6 +8,8 @@ It leverages **`sharp`** for high-performance thumbnail creation.
 
 - **Fast Thumbnail Generation:** Uses the high-performance `sharp` library to create optimized WebP thumbnails.
 - **Responsive Masonry Layout:** Generates a clean HTML file with embedded styles for a beautiful gallery that adapts to any screen size.
+- **Full-Screen Lightbox:** Implements a click-to-open lightbox modal for full-size viewing.
+- **Keyboard Navigation:** Allows users to close the lightbox with **Escape** and navigate images with **ArrowLeft/ArrowRight** keys.
 - **Safe Execution:** Includes a `--clean` flag to safely manage the output directory, preventing accidental file overwrites.
 - **Customizable:** Easily set the album title, thumbnail size, and input/output directories.
 
@@ -17,14 +19,14 @@ It leverages **`sharp`** for high-performance thumbnail creation.
 
 Since this is a command-line utility, you can run it directly without a permanent install using `npx` or `pnpm dlx`.
 
-### Quick Run (Recommended)
+### Quick Run
 
 Run the tool on the fly using your package manager:
 
 | Package Manager | Command Example       |
 | :-------------- | :-------------------- |
-| **pnpm dlx**    | `pnpm dlx albumthese` |
-| **npx**         | `npx albumthese`      |
+| **pnpm**        | `pnpm dlx albumthese` |
+| **npm**         | `npx albumthese`      |
 
 ### Global Installation
 
