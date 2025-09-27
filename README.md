@@ -1,16 +1,15 @@
 # albumthese ✨ - CLI Photo Gallery Generator
 
-**`albumthese`** is a small command-line interface (CLI) tool designed to quickly generate a responsive, modern, masonry-style photo gallery with an integrated lightbox from a simple directory of images.
-
-It leverages **`sharp`** for high-performance thumbnail creation.
+**`albumthese`** is a lightweight command-line interface (CLI) tool designed to quickly generate a responsive, modern, masonry-style photo gallery with an integrated lightbox from a simple directory of images.
 
 ## 🚀 Features
 
-- **Fast Thumbnail Generation:** Uses the high-performance `sharp` library to create optimized WebP thumbnails.
+- **Fast Thumbnail Generation:** Uses the high-performance sharp library to create optimized WebP thumbnails.
 - **Responsive Masonry Layout:** Generates a clean HTML file with embedded styles for a beautiful gallery that adapts to any screen size.
 - **Full-Screen Lightbox:** Implements a click-to-open lightbox modal for full-size viewing.
 - **Keyboard Navigation:** Allows users to close the lightbox with **Escape** and navigate images with **ArrowLeft/ArrowRight** keys.
-- **Safe Execution:** Includes a `--clean` flag to safely manage the output directory, preventing accidental file overwrites.
+- **Sorting:** Allows sorting images by filename or modification date.
+- **Safe Execution:** Includes a _--clean_ flag to safely manage the output directory, preventing accidental file overwrites.
 - **Customizable:** Easily set the album title, thumbnail size, and input/output directories.
 
 ---
@@ -64,16 +63,17 @@ npx albumthese
 | `--output <d>` | `-o`  | `album`            | The destination directory for the generated gallery and assets.  |
 | `--name <t>`   | `-n`  | `My Photo Gallery` | The HTML page title for the gallery.                             |
 | `--size <px>`  | `-s`  | `300`              | The maximum width (in pixels) for the generated thumbnails.      |
+| `--sort <m>`   | `-r`  | `date`             | Sorts images by 'filename' (A-Z) or 'date' (modification time).  |
 | `--clean`      | —     | `false`            | Deletes the output directory before starting (use with caution). |
 
 ---
 
 ### Example
 
-Generate an album titled **"Mountain Views"** from a custom input folder `photos/` and save it into `web/`, cleaning the output folder first:
+Generate an album titled **"Mountain Views"** from a custom input folder `photos/` and save it into `web/`, cleaning the output folder first, and sorting by filename:
 
 ```bash
-pnpm dlx albumthese -i photos -o web -n "Mountain Views" --clean
+pnpm dlx albumthese -i photos -o web -n "Mountain Views" --clean --sort filename
 ```
 
 ---
@@ -90,7 +90,7 @@ Clone the repository and install dependencies:
 pnpm install
 ```
 
-Run the tool locally (note the `--` to pass arguments to the script):
+Run the tool locally:
 
 ```bash
 pnpm run album -- -i [your-test-image-dir] -o [test-output-dir]
