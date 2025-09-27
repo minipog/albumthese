@@ -9,7 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     event.preventDefault()
 
-    // Get all gallery links
     if (allLinks.length === 0) {
       allLinks = Array.from(document.querySelectorAll('.gallery-item a'))
     }
@@ -30,24 +29,23 @@ document.addEventListener('DOMContentLoaded', () => {
         '<div id="lightbox-next" style="position:absolute;right:0;top:0;bottom:0;width:10%;display:flex;align-items:center;justify-content:center;font-size:3rem;color:white;opacity:0.6;user-select:none;cursor:pointer;">&#10095;</div>'
 
       lightbox.onclick = (e) => {
-        // Only close if clicking the background, not the image or controls
-        if (
-          e.target.id === 'lightbox' ||
-          e.target.id === 'lightbox-prev' ||
-          e.target.id === 'lightbox-next'
-        ) {
-          // Handle navigation clicks separately if not clicking the background
-          if (e.target.id === 'lightbox-prev') {
-            navigateLightbox(-1)
-          } else if (e.target.id === 'lightbox-next') {
-            navigateLightbox(1)
-          } else {
-            closeLightbox()
-          }
+        // Only close if clicking the lightbox background itself
+        if (e.target.id === 'lightbox') {
+          closeLightbox()
         }
       }
 
       document.body.appendChild(lightbox)
+
+      document.getElementById('lightbox-prev').onclick = (e) => {
+        e.stopPropagation()
+        navigateLightbox(-1)
+      }
+
+      document.getElementById('lightbox-next').onclick = (e) => {
+        e.stopPropagation()
+        navigateLightbox(1)
+      }
     }
 
     // Set the current image source and open the lightbox
