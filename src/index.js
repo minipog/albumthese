@@ -2,6 +2,7 @@
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import { constants as fsConstants } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 import sharp from 'sharp'
 
@@ -16,34 +17,22 @@ const COMPATIBLE_IMAGE_EXTENSIONS = new Set([
   '.svg',
 ])
 
-const HTML_TEMPLATE = `
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{PAGE_TITLE}}</title>
-    <style>
-      /* {{CSS_CONTENT}} */
-    </style>
-  </head>
-  <body>
-    <main class="masonry-gallery">
-      <!-- {{GALLERY_CONTENT}} -->
-    </main>
-  </body>
-</html>`
+const ASSETS_DIR = 'assets'
+const IMAGES_DIR = 'images'
+const THUMBS_DIR = 'thumbnails'
 
-const CSS_TEMPLATE = `
-*,*::before,*::after{box-sizing:border-box}
-:root{--gap:1.25rem}
-body{font-family:sans-serif;background-color:#f0f0f0;margin:0;padding:var(--gap)}
-.masonry-gallery{max-width:80rem;margin-inline:auto;column-count:3;column-gap:var(--gap)}
-.gallery-item{break-inside:avoid;margin:0 0 var(--gap);overflow:hidden;border-radius:.5rem;box-shadow:0 4px 8px rgba(0,0,0,.1)}
-.gallery-item img{width:100%;height:auto;display:block}
-@media(max-width:62.5em){.masonry-gallery{column-count:2}}
-@media(max-width:31.25em){.masonry-gallery{column-count:1}}
-`
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+async function loadStaticContent() {
+  const [htmlTemplate, cssContent, jsContent] = await Promise.all(
+    ['template.html', 'style.css', 'script.js'].map((file) =>
+      fs.readFile(path.join(__dirname, file), 'utf-8')
+    )
+  )
+
+  return { htmlTemplate, cssContent, jsContent }
+}
 
 async function getCompatibleFiles(dir) {
   const files = await fs.readdir(dir)
@@ -56,7 +45,6 @@ async function cleanDirectory(dir) {
   try {
     await fs.access(dir, fsConstants.F_OK)
     console.log(`🧹 Deleting existing output directory: ${dir}`)
-
     await fs.rm(dir, { recursive: true, force: true })
     console.log('✅ Directory deleted.')
   } catch (error) {
@@ -66,11 +54,10 @@ async function cleanDirectory(dir) {
   }
 }
 
-async function setupDirectories(outputDir, assetsDir, isCleanRun) {
+async function setupDirectories(outputDir, imagesDir, thumbsDir, isCleanRun) {
   if (!isCleanRun) {
     try {
       await fs.access(outputDir, fsConstants.F_OK)
-      // If access doesn't throw, the directory exists, and we stop.
       throw new Error(
         `Output directory "${outputDir}" already exists. Please remove it or run with the --clean flag to overwrite.`
       )
@@ -81,80 +68,109 @@ async function setupDirectories(outputDir, assetsDir, isCleanRun) {
     }
   }
 
-  await fs.mkdir(assetsDir, { recursive: true })
-  console.log(`Created output directory: ${outputDir}`)
+  console.log(`Creating output directory structure...`)
+  await Promise.all([
+    fs.mkdir(thumbsDir, { recursive: true }),
+    fs.mkdir(imagesDir, { recursive: true }),
+  ])
 }
 
-function generateImagePaths(files, opts) {
-  const assetsDir = path.join(opts.outputDir, 'assets')
-
+function createImagePaths(files, opts, imagesDir, thumbsDir) {
   return files.map((file) => {
     const fileData = path.parse(file)
+
     return {
       fileName: fileData.name,
       inputPath: path.join(opts.inputDir, file),
-      thumbnailPath: path.join(assetsDir, `thumbnail-${fileData.name}.webp`),
-      // Relative path for use in HTML <img> src attribute
+      fullImagePath: path.join(imagesDir, file),
+      relativeFullImagePath: path.join(ASSETS_DIR, IMAGES_DIR, file),
+      thumbnailPath: path.join(thumbsDir, `thumbnail-${fileData.name}.webp`),
       relativeThumbnailPath: path.join(
-        'assets',
+        ASSETS_DIR,
+        THUMBS_DIR,
         `thumbnail-${fileData.name}.webp`
       ),
     }
   })
 }
 
-async function createImageThumbnails(paths, opts) {
-  console.log('Generating thumbnails...')
-  const promises = paths.map((img) =>
-    sharp(img.inputPath)
-      .resize(opts.thumbnailSize)
-      .webp({ quality: 92 })
-      .toFile(img.thumbnailPath)
+async function copyFullSizeImages(paths) {
+  console.log('Copying full-size images for lightbox...')
+  await Promise.all(
+    paths.map((img) => fs.copyFile(img.inputPath, img.fullImagePath))
   )
-
-  await Promise.all(promises)
-  console.log('All thumbnails created!')
 }
 
-function generateGalleryHTML(imagePaths, opts) {
+async function createImageThumbnails(paths, opts) {
+  console.log('Generating thumbnails...')
+  await Promise.all(
+    paths.map((img) =>
+      sharp(img.inputPath)
+        .resize(opts.thumbnailSize)
+        .webp({ quality: 92 })
+        .toFile(img.thumbnailPath)
+    )
+  )
+}
+
+async function writeStaticAssets(cssContent, jsContent, assetsDir) {
+  console.log('Writing static assets...')
+  await Promise.all([
+    fs.writeFile(path.join(assetsDir, 'style.css'), cssContent),
+    fs.writeFile(path.join(assetsDir, 'script.js'), jsContent),
+  ])
+}
+
+function createAlbumHTML(imagePaths, opts, htmlTemplate) {
   console.log('Generating HTML...')
   const imageElements = imagePaths
     .map(
       (image) => `
       <figure class="gallery-item">
-        <img src="${image.relativeThumbnailPath}" alt="${image.fileName}" loading="lazy" decoding="async" />
+        <a href="${image.relativeFullImagePath}">
+          <img src="${image.relativeThumbnailPath}" alt="${image.fileName}" loading="lazy" decoding="async" />
+        </a>
       </figure>`
     )
     .join('')
 
-  return HTML_TEMPLATE.replace(/{{PAGE_TITLE}}/g, opts.albumName)
-    .replace('/* {{CSS_CONTENT}} */', CSS_TEMPLATE)
-    .replace('<!-- {{GALLERY_CONTENT}} -->', imageElements)
+  let html = htmlTemplate
+    .replace(/{{PAGE_TITLE}}/g, opts.albumName)
+    .replace('<!-- {{ALBUM_CONTENT}} -->', imageElements)
+
+  return html
 }
 
 async function main() {
   const opts = await parseCliOptions()
-
-  if (opts.clean) {
-    await cleanDirectory(opts.outputDir)
-  }
+  const { htmlTemplate, cssContent, jsContent } = await loadStaticContent()
 
   const files = await getCompatibleFiles(opts.inputDir)
   if (files.length === 0)
     throw new Error(`No compatible images found in "${opts.inputDir}".`)
 
+  if (opts.clean) {
+    await cleanDirectory(opts.outputDir)
+  }
+
+  const assetsDir = path.join(opts.outputDir, ASSETS_DIR)
+  const imagesDir = path.join(assetsDir, IMAGES_DIR)
+  const thumbsDir = path.join(assetsDir, THUMBS_DIR)
+
+  await setupDirectories(opts.outputDir, imagesDir, thumbsDir, opts.clean)
+
   console.log(`Found ${files.length} compatible images.`)
 
-  const assetsDir = path.join(opts.outputDir, 'assets')
-  await setupDirectories(opts.outputDir, assetsDir, opts.clean)
+  const imagePaths = createImagePaths(files, opts, imagesDir, thumbsDir)
 
-  const imagePaths = generateImagePaths(files, opts)
+  await writeStaticAssets(cssContent, jsContent, assetsDir)
+  await copyFullSizeImages(imagePaths)
   await createImageThumbnails(imagePaths, opts)
 
-  const htmlContent = generateGalleryHTML(imagePaths, opts)
+  const htmlContent = createAlbumHTML(imagePaths, opts, htmlTemplate)
   await fs.writeFile(path.join(opts.outputDir, 'index.html'), htmlContent)
 
-  console.log('✨ Done! Your gallery is ready.')
+  console.log('✨ Done! Your album is ready.')
 }
 
 main().catch((error) => {

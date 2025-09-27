@@ -1,6 +1,6 @@
 {
   "name": "albumthese",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A CLI tool to generate a responsive masonry photo gallery from a directory of images.",
   "main": "src/index.js",
   "type": "module",
@@ -26,7 +26,10 @@
   },
   "files": [
     "src/cli-options.js",
-    "src/index.js"
+    "src/index.js",
+    "src/style.css",
+    "src/template.html",
+    "src/script.js"
   ],
   "homepage": "https://github.com/minipog/albumthese#readme",
   "repository": {
