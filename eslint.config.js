@@ -4,6 +4,6 @@ import globals from 'globals'
 
 export default defineConfig(eslint.configs.recommended, {
   languageOptions: {
-    globals: { ...globals.node },
+    globals: { ...globals.node, ...globals.browser },
   },
 })
