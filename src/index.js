@@ -18,8 +18,8 @@ const COMPATIBLE_IMAGE_EXTENSIONS = new Set([
 ])
 
 const ASSETS_DIR = 'assets'
-const IMAGES_DIR = 'images'
-const THUMBS_DIR = 'thumbnails'
+const IMAGES_DIR = path.join(ASSETS_DIR, 'images')
+const THUMBS_DIR = path.join(ASSETS_DIR, 'thumbnails')
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -34,11 +34,46 @@ async function loadStaticContent() {
   return { htmlTemplate, cssContent, jsContent }
 }
 
-async function getCompatibleFiles(dir) {
+async function getFileStats(dir) {
   const files = await fs.readdir(dir)
-  return files.filter((file) =>
-    COMPATIBLE_IMAGE_EXTENSIONS.has(path.extname(file).toLowerCase())
-  )
+
+  const fileStatsPromises = files
+    .filter((file) =>
+      COMPATIBLE_IMAGE_EXTENSIONS.has(path.extname(file).toLowerCase())
+    )
+    .map(async (file) => {
+      const inputPath = path.join(dir, file)
+      const parsedPath = path.parse(file)
+
+      try {
+        const stats = await fs.stat(inputPath)
+
+        return {
+          name: file,
+          baseName: parsedPath.name,
+          inputPath: inputPath,
+          mtime: stats.mtimeMs,
+        }
+      } catch (error) {
+        console.warn(`Could not read stats for ${file}: ${error.message}`)
+        return null
+      }
+    })
+
+  const fileStats = await Promise.all(fileStatsPromises)
+
+  return fileStats.filter((stat) => stat !== null)
+}
+
+function sortFiles(files, method) {
+  console.log(`Sorting ${files.length} files by ${method}...`)
+  if (method === 'date') {
+    // Sort ascending by modification time (Oldest first)
+    files.sort((a, b) => a.mtime - b.mtime)
+    return
+  }
+
+  files.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 async function cleanDirectory(dir) {
@@ -75,21 +110,17 @@ async function setupDirectories(outputDir, imagesDir, thumbsDir, isCleanRun) {
   ])
 }
 
-function createImagePaths(files, opts, imagesDir, thumbsDir) {
-  return files.map((file) => {
-    const fileData = path.parse(file)
+function createImagePaths(filesWithStats, imagesDir, thumbsDir) {
+  return filesWithStats.map((fileData) => {
+    const thumbFileName = `thumbnail-${fileData.baseName}.webp`
 
     return {
-      fileName: fileData.name,
-      inputPath: path.join(opts.inputDir, file),
-      fullImagePath: path.join(imagesDir, file),
-      relativeFullImagePath: path.join(ASSETS_DIR, IMAGES_DIR, file),
-      thumbnailPath: path.join(thumbsDir, `thumbnail-${fileData.name}.webp`),
-      relativeThumbnailPath: path.join(
-        ASSETS_DIR,
-        THUMBS_DIR,
-        `thumbnail-${fileData.name}.webp`
-      ),
+      fileName: fileData.baseName,
+      inputPath: fileData.inputPath,
+      fullImagePath: path.join(imagesDir, fileData.name),
+      thumbnailPath: path.join(thumbsDir, thumbFileName),
+      relativeFullImagePath: path.join(IMAGES_DIR, fileData.name),
+      relativeThumbnailPath: path.join(THUMBS_DIR, thumbFileName),
     }
   })
 }
@@ -145,23 +176,25 @@ async function main() {
   const opts = await parseCliOptions()
   const { htmlTemplate, cssContent, jsContent } = await loadStaticContent()
 
-  const files = await getCompatibleFiles(opts.inputDir)
-  if (files.length === 0)
+  const filesWithStats = await getFileStats(opts.inputDir)
+  if (filesWithStats.length === 0)
     throw new Error(`No compatible images found in "${opts.inputDir}".`)
+
+  sortFiles(filesWithStats, opts.sortingMethod)
+
+  console.log(`Found ${filesWithStats.length} compatible images.`)
 
   if (opts.clean) {
     await cleanDirectory(opts.outputDir)
   }
 
   const assetsDir = path.join(opts.outputDir, ASSETS_DIR)
-  const imagesDir = path.join(assetsDir, IMAGES_DIR)
-  const thumbsDir = path.join(assetsDir, THUMBS_DIR)
+  const imagesDir = path.join(opts.outputDir, IMAGES_DIR)
+  const thumbsDir = path.join(opts.outputDir, THUMBS_DIR)
 
   await setupDirectories(opts.outputDir, imagesDir, thumbsDir, opts.clean)
 
-  console.log(`Found ${files.length} compatible images.`)
-
-  const imagePaths = createImagePaths(files, opts, imagesDir, thumbsDir)
+  const imagePaths = createImagePaths(filesWithStats, imagesDir, thumbsDir)
 
   await writeStaticAssets(cssContent, jsContent, assetsDir)
   await copyFullSizeImages(imagePaths)
